@@ -13,7 +13,7 @@ df_caico = pd.read_csv("resultado_meses_caico.csv")
 
 # Seleção do mês e da cidade pelo usuário
 mes_selecionado = st.sidebar.selectbox("Selecione o mês", meses)
-cidade_selecionada = st.sidebar.selectbox("Selecione a cidade", ["Natal", "Caicó"])
+cidade_selecionada = st.selectbox("Selecione a cidade", ["Natal", "Caicó"])
 
 if cidade_selecionada == "Natal":
     df = df_natal
