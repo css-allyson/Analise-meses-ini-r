@@ -80,7 +80,7 @@ def plot_boxplot(data, coluna):
 # Gerar gráficos separados para cada coluna de resultados
 for coluna in colunas_resultados:
     # Dividir a área em duas colunas com proporções diferentes: 70% para o gráfico de barras e 30% para o boxplot
-    col1, col2 = st.columns([0.5, 0.5])
+    col1, col2 = st.columns([0.7, 0.3])
     
     # Gráfico de barras com linha de média
     with col1:
