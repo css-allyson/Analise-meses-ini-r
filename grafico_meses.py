@@ -1,72 +1,91 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 import plotly.express as px
-
+import plotly.graph_objects as go
 
 # Listas de meses
 meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 
          'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']
 
+# Colunas de resultados
 colunas_resultados = ['CgTR', 'CgTA', 'PHsFT', 'PHiFT', 'TOMax', 'TOMin']
-colunas_entradas = ["ANG_N_ange", "ANG_N_anghd", "ANG_N_anghe", "ANG_N_angv", "ANG_O_ange",
-                    "ANG_O_anghd", "ANG_O_anghe", "ANG_O_angv", "ANG_S_ange", "ANG_S_anghd",
-                    "ANG_S_anghe", "ANG_S_angv", "ANG_L_ange", "ANG_L_anghd", "ANG_L_anghe",
-                    "ANG_L_angv", "APP_CeilingHeight", "CONST_ThermalConductance_COB",
-                    "CONST_ThermalConductance_PAR_EXT", "CONST_ThermalConductance_PISO_TERREO",
-                    "CONST_cob_CT", "CONST_laje_CT", "CONST_par_ext_CT", "SAMPLE_openFactor",
-                    "SAMPLE_roof_abs", "SAMPLE_shgc", "SAMPLE_uVidro", "SAMPLE_wall_abs"]
 
+# Carregar os dataframes de Natal e Caicó
+df_natal = pd.read_csv("resultado_meses_natal.csv")
+df_caico = pd.read_csv("resultado_meses_caico.csv")
 
-df = pd.read_csv("resultado_meses.csv")
+# Seleção do mês e cidade pelo usuário
+mes_selecionado = st.sidebar.selectbox("Selecione o mês", meses)
+cidade_selecionada = st.selectbox("Selecione a cidade", ["Natal", "Caicó"])
 
-# Seleção do mês pelo usuário
-mes_selecionado = st.selectbox("Selecione o mês", meses)
+# Filtrar o dataframe pela cidade selecionada
+if cidade_selecionada == "Natal":
+    df = df_natal
+else:
+    df = df_caico
 
 # Filtrar o dataframe para o mês selecionado
 df_filtrado = df[df['CLIMA_month'] == mes_selecionado]
 
-# Calcular as médias dos resultados
-resultados = ['CgTR', 'CgTA', 'PHsFT', 'PHiFT', 'TOMax', 'TOMin']
-medias = {resultado: df_filtrado[resultado].mean() for resultado in resultados}
-
-# Criar um DataFrame para a tabela
-df_tabela = pd.DataFrame(list(medias.items()), columns=['Resultado', 'Média'])
-
 # Exibir a tabela no Streamlit
-st.write(f"**Médias dos Resultados para o mês de {mes_selecionado}:**")
-st.dataframe(df_tabela)
+st.sidebar.write(f"**Estatísticas descritivas para o mês de {mes_selecionado}:**")
+st.sidebar.dataframe(df_filtrado[colunas_resultados].describe())
 
-# Agrupar o dataframe por 'CLIMA_month' e calcular a média dos valores
-df_grouped = df.groupby('CLIMA_month').mean().reset_index()
+# Agrupar o dataframe por 'CLIMA_month' e calcular o valor máximo e a média dos resultados
+df_grouped_max = df.groupby('CLIMA_month').max().reset_index()
+df_grouped_mean = df.groupby('CLIMA_month').mean().reset_index()
 
-# Função para criar o gráfico de barras interativo
-def plot_interactive_bar_chart(data, coluna, meses):
-    fig = px.bar(data, x='CLIMA_month', y=coluna, 
-                 category_orders={'CLIMA_month': meses}, 
-                 labels={'CLIMA_month': 'Mês', coluna: f'Média de {coluna}'},
-                 title=f'Média de {coluna} por Mês')
-    fig.update_layout(xaxis_title='Mês', yaxis_title=f'Média de {coluna}', 
-                      title_x=0.5, xaxis_tickangle=-45)
-    st.plotly_chart(fig)
+# Converter 'CLIMA_month' para uma categoria ordenada com base na lista 'meses'
+df_grouped_max['CLIMA_month'] = pd.Categorical(df_grouped_max['CLIMA_month'], categories=meses, ordered=True)
+df_grouped_mean['CLIMA_month'] = pd.Categorical(df_grouped_mean['CLIMA_month'], categories=meses, ordered=True)
 
-# Lista de colunas para plotar
-colunas = ['CgTR', 'CgTA', 'PHsFT', 'PHiFT', 'TOMax', 'TOMin']
+# Reordenar os dataframes de acordo com a ordem dos meses
+df_grouped_max = df_grouped_max.sort_values('CLIMA_month')
+df_grouped_mean = df_grouped_mean.sort_values('CLIMA_month')
 
-# Gerar gráficos separados
-for coluna in colunas:
-    plot_interactive_bar_chart(df_grouped, coluna, meses)
-
-
-# Selecionar apenas as colunas relevantes para o gráfico
-colunas_relevantes = colunas_entradas + colunas_resultados
-df_relevante = df_filtrado[colunas_relevantes]
-
-# Criar o gráfico de coordenadas paralelas
-fig = px.parallel_coordinates(df_relevante, dimensions=colunas_relevantes, color='CgTR',
-                              labels={col: col for col in colunas_relevantes},
-                              title=f'Gráfico de Coordenadas Paralelas para o mês de {mes_selecionado}')
-
-# Exibir o gráfico
-st.plotly_chart(fig)
+# Função para criar o gráfico de barras interativo com linha de média
+def plot_interactive_bar_chart_with_mean(data_max, data_mean, coluna, meses):
+    # Gráfico de barras com o valor máximo
+    fig_bar = px.bar(data_max, x='CLIMA_month', y=coluna, 
+                     category_orders={'CLIMA_month': meses}, 
+                     labels={'CLIMA_month': 'Mês', coluna: f'Valor Máximo de {coluna}'},
+                     title=f'Valor Máximo de {coluna} por Mês')
     
+    # Adicionar linha da média dos meses
+    fig_bar.add_trace(go.Scatter(
+        x=data_mean['CLIMA_month'], 
+        y=data_mean[coluna],
+        mode='lines+markers',
+        name='Média',
+        line=dict(color='red', dash='dash')
+    ))
+    
+    # Ajustes no layout do gráfico de barras
+    fig_bar.update_layout(xaxis_title='Mês', yaxis_title=f'Valor Máximo de {coluna}', 
+                          title_x=0.5, xaxis_tickangle=-45)
+    
+    return fig_bar
+
+# Função para criar o boxplot
+def plot_boxplot(data, coluna):
+    # Gráfico boxplot para a coluna selecionada
+    fig_box = px.box(data, x='CLIMA_month', y=coluna, 
+                     category_orders={'CLIMA_month': meses},
+                     labels={'CLIMA_month': 'Mês', coluna: f'Boxplot de {coluna}'},
+                     title=f'Boxplot de {coluna} por Mês')
+    fig_box.update_layout(xaxis_title='Mês', yaxis_title=f'{coluna}', title_x=0.5)
+    
+    return fig_box
+
+# Gerar gráficos separados para cada coluna de resultados
+for coluna in colunas_resultados:
+    # Dividir a área em duas colunas com proporções diferentes: 70% para o gráfico de barras e 30% para o boxplot
+    col1, col2 = st.columns([0.85, 0.15])
+    
+    # Gráfico de barras com linha de média
+    with col1:
+        st.plotly_chart(plot_interactive_bar_chart_with_mean(df_grouped_max, df_grouped_mean, coluna, meses))
+    
+    # Gráfico boxplot
+    with col2:
+        st.plotly_chart(plot_boxplot(df, coluna))
